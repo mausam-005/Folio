@@ -43,24 +43,20 @@ export const api = {
   openPath: async (filePath) => {
     try {
       if (isElectron) return await window.electronAPI.openPath(filePath);
-      alert('Desktop Action: Open file via default system application: ' + filePath);
+      console.log('Open file action in browser demo:', filePath);
     } catch (err) {
       if (isElectron) {
         window.electronAPI.showNotification('File Not Found', `The file at "${filePath}" is no longer on disk.`);
-      } else {
-        alert('File not found: ' + filePath);
       }
     }
   },
   revealInFinder: async (filePath) => {
     try {
       if (isElectron) return await window.electronAPI.revealInFinder(filePath);
-      alert('Desktop Action: Reveal in Finder / File Explorer: ' + filePath);
+      console.log('Reveal in Finder action in browser demo:', filePath);
     } catch (err) {
       if (isElectron) {
         window.electronAPI.showNotification('File Not Found', `Cannot locate "${filePath}" in Finder.`);
-      } else {
-        alert('File path not found: ' + filePath);
       }
     }
   },
@@ -70,13 +66,31 @@ export const api = {
   },
   selectFilesDialog: async () => {
     if (isElectron) return window.electronAPI.selectFilesDialog();
-    alert('Native OS file picker requires running inside the Electron window.');
-    return [];
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.onchange = (e) => {
+        const files = Array.from(e.target.files || []);
+        resolve(files);
+      };
+      input.click();
+    });
   },
   selectFolderDialog: async () => {
     if (isElectron && window.electronAPI.selectFolderDialog) return window.electronAPI.selectFolderDialog();
-    alert('Native OS folder picker requires running inside the Electron window.');
-    return [];
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.webkitdirectory = true;
+      input.directory = true;
+      input.multiple = true;
+      input.onchange = (e) => {
+        const files = Array.from(e.target.files || []);
+        resolve(files);
+      };
+      input.click();
+    });
   },
   showNotification: async (title, body) => {
     if (isElectron) return window.electronAPI.showNotification(title, body);
@@ -88,7 +102,7 @@ export const api = {
   },
   readTextPreview: async (filePath) => {
     if (isElectron) return window.electronAPI.readTextPreview(filePath);
-    return 'Text preview is available in the desktop Electron app.';
+    return 'Text preview is active in the desktop Electron app.';
   },
   getFileStats: async (filePath) => {
     if (isElectron) return window.electronAPI.getFileStats(filePath);
@@ -96,7 +110,6 @@ export const api = {
   },
   changeFormat: async (options) => {
     if (isElectron) return window.electronAPI.changeFormat(options);
-    alert('Format conversion is available in the desktop Electron app.');
     return { success: false };
   },
   getThumbnail: async (filePath) => {
@@ -121,132 +134,86 @@ export const api = {
   // Database operations
   addFiles: async (filePaths) => {
     if (isElectron) return window.electronAPI.addFiles(filePaths);
-    return [];
+    try {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('folio_browser_files') : null;
+      const files = stored ? JSON.parse(stored) : [];
+      const newItems = filePaths.map((fp, idx) => {
+        const name = typeof fp === 'string' ? fp.split('/').pop() : fp.name || 'imported_file';
+        const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : 'txt';
+        return {
+          id: Date.now() + idx,
+          name,
+          path: typeof fp === 'string' ? fp : '/' + name,
+          size: fp.size || 2048,
+          extension: ext,
+          category: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext)
+            ? 'image'
+            : ['pdf', 'doc', 'docx', 'txt', 'md', 'csv'].includes(ext)
+            ? 'document'
+            : ['js', 'jsx', 'ts', 'tsx', 'py', 'json', 'html', 'css'].includes(ext)
+            ? 'code'
+            : 'other',
+          is_favorite: 0,
+          notes: '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          tags: [],
+        };
+      });
+      const updated = [...files, ...newItems];
+      localStorage.setItem('folio_browser_files', JSON.stringify(updated));
+      return newItems;
+    } catch (e) {
+      return [];
+    }
   },
   getFiles: async (filters = {}) => {
     if (isElectron) return window.electronAPI.getFiles(filters);
-    const mockFiles = [
-      {
-        id: 1,
-        name: 'DesignSystem-v2',
-        path: '/Users/developer/Projects/DesignSystem-v2',
-        size: 8400000,
-        extension: 'folder',
-        category: 'folder',
-        is_favorite: 1,
-        notes: 'Core design system tokens and component specs',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags: [{ id: 1, name: 'Design', color: '#EC4899' }],
-      },
-      {
-        id: 2,
-        name: 'design_tokens.json',
-        path: '/Users/developer/Projects/DesignSystem-v2/tokens/design_tokens.json',
-        size: 420000,
-        extension: 'json',
-        category: 'code',
-        is_favorite: 0,
-        notes: 'Color palettes, typography scales, and shadows',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags: [{ id: 2, name: 'Production', color: '#6366F1' }],
-      },
-      {
-        id: 3,
-        name: 'brand_guidelines.pdf',
-        path: '/Users/developer/Projects/DesignSystem-v2/specs/brand_guidelines.pdf',
-        size: 1850000,
-        extension: 'pdf',
-        category: 'document',
-        is_favorite: 1,
-        notes: 'Brand typography, layout grid, and icon styles',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags: [{ id: 1, name: 'Design', color: '#EC4899' }],
-      },
-      {
-        id: 4,
-        name: 'color_palette.png',
-        path: '/Users/developer/Projects/DesignSystem-v2/assets/color_palette.png',
-        size: 320000,
-        extension: 'png',
-        category: 'image',
-        is_favorite: 0,
-        notes: 'Exported dark luxury palette preview',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags: [{ id: 1, name: 'Design', color: '#EC4899' }],
-      },
-      {
-        id: 5,
-        name: 'MobileApp-Core',
-        path: '/Users/developer/Projects/MobileApp-Core',
-        size: 5100000,
-        extension: 'folder',
-        category: 'folder',
-        is_favorite: 0,
-        notes: 'Cross-platform mobile workspace',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags: [],
-      },
-      {
-        id: 6,
-        name: 'release_notes.md',
-        path: '/Users/developer/Projects/MobileApp-Core/docs/release_notes.md',
-        size: 6400,
-        extension: 'md',
-        category: 'document',
-        is_favorite: 0,
-        notes: 'Version 2.4 changelog and migration guide',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags: [],
-      },
-      {
-        id: 7,
-        name: 'App.jsx',
-        path: '/Users/developer/Projects/MobileApp-Core/src/App.jsx',
-        size: 19800,
-        extension: 'jsx',
-        category: 'code',
-        is_favorite: 1,
-        notes: 'Main application container and navigation layout',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags: [{ id: 2, name: 'Production', color: '#6366F1' }],
-      },
-      {
-        id: 8,
-        name: 'analytics_metrics.csv',
-        path: '/Users/developer/Projects/MobileApp-Core/data/analytics_metrics.csv',
-        size: 1250000,
-        extension: 'csv',
-        category: 'document',
-        is_favorite: 0,
-        notes: 'Q3 user retention and performance telemetry',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags: [{ id: 3, name: 'Important', color: '#EF4444' }],
-      },
-    ];
-
-    if (filters.category && filters.category !== 'all') {
-      return mockFiles.filter((f) => f.category === filters.category);
+    try {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('folio_browser_files') : null;
+      let files = stored ? JSON.parse(stored) : [];
+      if (filters.category && filters.category !== 'all') {
+        files = files.filter((f) => f.category === filters.category);
+      }
+      if (filters.favoriteOnly) {
+        files = files.filter((f) => f.is_favorite);
+      }
+      if (filters.tagId) {
+        files = files.filter((f) => f.tags && f.tags.some((t) => t.id === filters.tagId));
+      }
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        files = files.filter((f) => f.name.toLowerCase().includes(q) || (f.notes && f.notes.toLowerCase().includes(q)));
+      }
+      return files;
+    } catch (e) {
+      return [];
     }
-    if (filters.favoriteOnly) {
-      return mockFiles.filter((f) => f.is_favorite);
-    }
-    return mockFiles;
   },
   deleteFile: async (fileId) => {
     if (isElectron) return window.electronAPI.deleteFile(fileId);
-    return true;
+    try {
+      const stored = localStorage.getItem('folio_browser_files');
+      let files = stored ? JSON.parse(stored) : [];
+      files = files.filter((f) => f.id !== fileId);
+      localStorage.setItem('folio_browser_files', JSON.stringify(files));
+      return true;
+    } catch (e) {
+      return false;
+    }
   },
   deleteFiles: async (fileIds) => {
     if (isElectron) return window.electronAPI.deleteFiles(fileIds);
-    return true;
+    try {
+      const idsSet = new Set(fileIds);
+      const stored = localStorage.getItem('folio_browser_files');
+      let files = stored ? JSON.parse(stored) : [];
+      files = files.filter((f) => !idsSet.has(f.id));
+      localStorage.setItem('folio_browser_files', JSON.stringify(files));
+      return true;
+    } catch (e) {
+      return false;
+    }
   },
   attachTagToMultiple: async (fileIds, tagId) => {
     if (isElectron) return window.electronAPI.attachTagToMultiple(fileIds, tagId);
@@ -254,18 +221,34 @@ export const api = {
   },
   toggleFavorite: async (fileId) => {
     if (isElectron) return window.electronAPI.toggleFavorite(fileId);
-    return false;
+    try {
+      const stored = localStorage.getItem('folio_browser_files');
+      let files = stored ? JSON.parse(stored) : [];
+      files = files.map((f) => (f.id === fileId ? { ...f, is_favorite: f.is_favorite ? 0 : 1 } : f));
+      localStorage.setItem('folio_browser_files', JSON.stringify(files));
+      return true;
+    } catch (e) {
+      return false;
+    }
   },
   updateNotes: async (fileId, notes) => {
     if (isElectron) return window.electronAPI.updateNotes(fileId, notes);
-    return true;
+    try {
+      const stored = localStorage.getItem('folio_browser_files');
+      let files = stored ? JSON.parse(stored) : [];
+      files = files.map((f) => (f.id === fileId ? { ...f, notes } : f));
+      localStorage.setItem('folio_browser_files', JSON.stringify(files));
+      return true;
+    } catch (e) {
+      return false;
+    }
   },
   getTags: async () => {
     if (isElectron) return window.electronAPI.getTags();
     return [
-      { id: 1, name: 'Design', color: '#EC4899', count: 3 },
-      { id: 2, name: 'Production', color: '#6366F1', count: 2 },
-      { id: 3, name: 'Important', color: '#EF4444', count: 1 },
+      { id: 1, name: 'Design', color: '#EC4899', count: 0 },
+      { id: 2, name: 'Production', color: '#6366F1', count: 0 },
+      { id: 3, name: 'Important', color: '#EF4444', count: 0 },
       { id: 4, name: 'Archive', color: '#10B981', count: 0 },
     ];
   },
@@ -287,6 +270,17 @@ export const api = {
   },
   getStats: async () => {
     if (isElectron) return window.electronAPI.getStats();
-    return { totalFiles: 8, totalSize: 17400000, favCount: 3, tagCount: 3 };
+    try {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('folio_browser_files') : null;
+      const files = stored ? JSON.parse(stored) : [];
+      return {
+        totalFiles: files.length,
+        totalSize: files.reduce((acc, f) => acc + (f.size || 0), 0),
+        favCount: files.filter((f) => f.is_favorite).length,
+        tagCount: 4,
+      };
+    } catch (e) {
+      return { totalFiles: 0, totalSize: 0, favCount: 0, tagCount: 4 };
+    }
   },
 };
