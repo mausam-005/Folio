@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Info, X } from 'lucide-react';
 import Titlebar from './components/Titlebar';
 import Sidebar from './components/Sidebar';
 import FileList from './components/FileList';
@@ -10,6 +11,7 @@ import SplashScreen from './components/SplashScreen';
 import FormatModal from './components/FormatModal';
 import ConfirmModal from './components/ConfirmModal';
 import AboutModal from './components/AboutModal';
+import FileAccessModal from './components/FileAccessModal';
 import { api } from './api';
 
 export default function App() {
@@ -23,6 +25,33 @@ export default function App() {
   const [formatFile, setFormatFile] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // One-time File Access Permission state (Web only)
+  const [fileAccessModalOpen, setFileAccessModalOpen] = useState(false);
+  const [pendingDropPaths, setPendingDropPaths] = useState(null);
+
+  // In-App Toast Notifications state
+  const [toasts, setToasts] = useState([]);
+
+  useEffect(() => {
+    const handleNotification = (e) => {
+      const { id, title, body } = e.detail || {};
+      if (!title) return;
+      const toastId = id || `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      setToasts((prev) => [...prev.slice(-3), { id: toastId, title, body }]);
+
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== toastId));
+      }, 3500);
+    };
+
+    window.addEventListener('folio-notification', handleNotification);
+    return () => window.removeEventListener('folio-notification', handleNotification);
+  }, []);
+
+  const handleDismissToast = (id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   // Fullscreen state listener for dynamic macOS Titlebar alignment
   useEffect(() => {
@@ -208,24 +237,92 @@ export default function App() {
 
       if (e.dataTransfer) {
         let paths = [];
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          paths = Array.from(e.dataTransfer.files)
-            .map((f) => api.getPathForFile(f))
-            .filter(Boolean);
-        }
-        if (paths.length === 0 && e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-          for (const item of Array.from(e.dataTransfer.items)) {
-            if (item.kind === 'file') {
-              const file = item.getAsFile();
-              if (file) {
-                const p = api.getPathForFile(file);
-                if (p) paths.push(p);
+        if (api.isElectron) {
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            paths = Array.from(e.dataTransfer.files)
+              .map((f) => api.getPathForFile(f))
+              .filter(Boolean);
+          }
+        } else {
+          // Web browser recursive parser for dropped folders and files from Finder
+          const items = e.dataTransfer.items;
+          if (items && items.length > 0) {
+            const collected = [];
+            const readDirEntries = (reader) => {
+              return new Promise((resolve) => {
+                reader.readEntries(
+                  (entries) => resolve(entries || []),
+                  () => resolve([])
+                );
+              });
+            };
+
+            const traverseEntry = async (entry, currentPath = '') => {
+              if (!entry) return;
+              const fullPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+              if (entry.isFile) {
+                const file = await new Promise((resolve) => entry.file(resolve, () => resolve(null)));
+                if (file) {
+                  Object.defineProperty(file, 'webkitRelativePath', {
+                    value: fullPath,
+                    writable: true,
+                    configurable: true,
+                  });
+                  collected.push(file);
+                }
+              } else if (entry.isDirectory) {
+                collected.push({
+                  name: entry.name,
+                  path: '/' + fullPath,
+                  webkitRelativePath: fullPath,
+                  category: 'folder',
+                  extension: 'folder',
+                  size: 0,
+                  isDirectory: true,
+                });
+                const dirReader = entry.createReader();
+                let entriesChunk = await readDirEntries(dirReader);
+                while (entriesChunk.length > 0) {
+                  for (const child of entriesChunk) {
+                    await traverseEntry(child, fullPath);
+                  }
+                  entriesChunk = await readDirEntries(dirReader);
+                }
+              }
+            };
+
+            const promises = [];
+            for (let i = 0; i < items.length; i++) {
+              const item = items[i];
+              if (typeof item.webkitGetAsEntry === 'function') {
+                const entry = item.webkitGetAsEntry();
+                if (entry) {
+                  promises.push(traverseEntry(entry));
+                  continue;
+                }
+              }
+              if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (file) collected.push(file);
               }
             }
+            if (promises.length > 0) {
+              await Promise.all(promises);
+            }
+            paths = collected;
+          }
+
+          if (paths.length === 0 && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            paths = Array.from(e.dataTransfer.files);
           }
         }
 
         if (paths.length > 0) {
+          if (!hasFileAccessConsent()) {
+            setPendingDropPaths(paths);
+            setFileAccessModalOpen(true);
+            return;
+          }
           const added = await api.addFiles(paths);
           await refreshData();
           api.showNotification('Folio Import', `Successfully imported ${added.length} item(s).`);
@@ -246,13 +343,48 @@ export default function App() {
     };
   }, [refreshData]);
 
-  // Handler: Open OS Import Dialog (selects files, folders, or both)
-  const handleImportDialog = async () => {
+  // Check if one-time file access consent was granted (Desktop skips this)
+  const hasFileAccessConsent = () => {
+    if (api.isElectron) return true;
+    try {
+      return localStorage.getItem('folio_file_access_granted') === 'true';
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const executeImport = async () => {
     const paths = await api.selectFilesDialog();
     if (paths && paths.length > 0) {
       const added = await api.addFiles(paths);
       await refreshData();
-      api.showNotification('Folio Import', `Imported ${added.length} item(s) into Folio.`);
+      api.showNotification('Folio Import', `Imported ${added.length} file(s) into Folio.`);
+    }
+  };
+
+  // Handler: Open OS Import Files Dialog (prompts on first use on web)
+  const handleImportDialog = async () => {
+    if (!hasFileAccessConsent()) {
+      setPendingDropPaths(null);
+      setFileAccessModalOpen(true);
+      return;
+    }
+    await executeImport();
+  };
+
+  const handleGrantFileAccess = async () => {
+    try {
+      localStorage.setItem('folio_file_access_granted', 'true');
+    } catch (e) {}
+    setFileAccessModalOpen(false);
+
+    if (pendingDropPaths && pendingDropPaths.length > 0) {
+      const added = await api.addFiles(pendingDropPaths);
+      setPendingDropPaths(null);
+      await refreshData();
+      api.showNotification('Folio Import', `Successfully imported ${added.length} item(s).`);
+    } else {
+      await executeImport();
     }
   };
 
@@ -292,10 +424,11 @@ export default function App() {
     await api.deleteFile(fileId);
     setSelectedIds((prev) => {
       const next = new Set(prev);
+      next.delete(String(fileId));
       next.delete(fileId);
       return next;
     });
-    if (selectedFile?.id === fileId) {
+    if (selectedFile && String(selectedFile.id) === String(fileId)) {
       setSelectedFile(null);
     }
     await refreshData();
@@ -307,7 +440,7 @@ export default function App() {
     if (!fileIds || fileIds.length === 0) return;
     await api.deleteFiles(fileIds);
     setSelectedIds(new Set());
-    if (selectedFile && fileIds.includes(selectedFile.id)) {
+    if (selectedFile && fileIds.some((id) => String(id) === String(selectedFile.id))) {
       setSelectedFile(null);
     }
     await refreshData();
@@ -477,6 +610,42 @@ export default function App() {
 
       {/* Drag & Drop Visual Overlay */}
       <DropZone isDragging={isDragging} />
+
+      {/* In-App Toast Notifications Stack */}
+      <div className="fixed top-12 right-4 z-50 flex flex-col space-y-2 pointer-events-none max-w-sm w-full">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className="pointer-events-auto bg-[#181C20]/95 backdrop-blur-md border border-[#30363C] shadow-2xl rounded-lg p-3 flex items-start space-x-3 animate-in fade-in slide-in-from-top-2 duration-150"
+          >
+            <div className="p-1 rounded bg-[#20252A] text-[#B7C7D8] flex-shrink-0 mt-0.5">
+              <Info className="w-3.5 h-3.5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-[#ECEFF1] truncate">{toast.title}</div>
+              {toast.body && (
+                <div className="text-[11px] text-[#92999F] mt-0.5 leading-snug line-clamp-2">{toast.body}</div>
+              )}
+            </div>
+            <button
+              onClick={() => handleDismissToast(toast.id)}
+              className="text-[#70777E] hover:text-[#ECEFF1] p-0.5 rounded transition-colors flex-shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* First-Time File Access & Privacy Modal (Web Only, One-Time) */}
+      <FileAccessModal
+        isOpen={fileAccessModalOpen}
+        onClose={() => {
+          setPendingDropPaths(null);
+          setFileAccessModalOpen(false);
+        }}
+        onConfirm={handleGrantFileAccess}
+      />
     </div>
   );
 }

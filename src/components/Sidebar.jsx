@@ -161,32 +161,41 @@ export default function Sidebar({
       </div>
 
       {/* Disk Storage & Workspace Info Footer */}
-      <div className="p-3 border-t border-[#30363C] bg-[#101214] select-none space-y-2">
-        <div className="flex items-center justify-between text-[11px]">
-          <div className="flex items-center space-x-1.5 text-[#ECEFF1] font-medium min-w-0 truncate">
-            <HardDrive className="w-3.5 h-3.5 text-[#B7C7D8] flex-shrink-0" />
-            <span className="truncate">{diskSpace?.diskName || 'Macintosh HD'}</span>
+      {api.isElectron && diskSpace ? (
+        <div className="p-3 border-t border-[#30363C] bg-[#101214] select-none space-y-2">
+          <div className="flex items-center justify-between text-[11px]">
+            <div className="flex items-center space-x-1.5 text-[#ECEFF1] font-medium min-w-0 truncate">
+              <HardDrive className="w-3.5 h-3.5 text-[#B7C7D8] flex-shrink-0" />
+              <span className="truncate">{diskSpace?.diskName || 'Macintosh HD'}</span>
+            </div>
+            <span className="text-[10px] font-mono text-[#92999F] flex-shrink-0 ml-1">
+              {formatBytes(diskSpace?.freeBytes)} free
+            </span>
           </div>
-          <span className="text-[10px] font-mono text-[#92999F] flex-shrink-0 ml-1">
-            {formatBytes(diskSpace?.freeBytes)} free
+
+          {/* Disk Usage Gauge */}
+          <div className="w-full bg-[#191D21] h-1.5 rounded-full overflow-hidden border border-[#30363C]">
+            <div 
+              className="bg-gradient-to-r from-[#70777E] via-[#92999F] to-[#B7C7D8] h-full rounded-full transition-all duration-300"
+              style={{ width: `${diskSpace?.percentUsed || 50}%` }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-[10px] text-[#70777E] font-mono">
+            <span className="truncate">{formatBytes(diskSpace?.usedBytes)} used</span>
+            <span className="text-[#ECEFF1] font-semibold flex-shrink-0 ml-1">
+              {stats?.totalFiles || 0} files
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="p-3 border-t border-[#30363C] bg-[#101214] select-none flex items-center justify-between text-[11px]">
+          <span className="text-[#70777E]">Catalog</span>
+          <span className="text-[#ECEFF1] font-mono font-medium">
+            {stats?.totalFiles || 0} {stats?.totalFiles === 1 ? 'file' : 'files'}
           </span>
         </div>
-
-        {/* Disk Usage Gauge */}
-        <div className="w-full bg-[#191D21] h-1.5 rounded-full overflow-hidden border border-[#30363C]">
-          <div 
-            className="bg-gradient-to-r from-[#70777E] via-[#92999F] to-[#B7C7D8] h-full rounded-full transition-all duration-300"
-            style={{ width: `${diskSpace?.percentUsed || 50}%` }}
-          />
-        </div>
-
-        <div className="flex items-center justify-between text-[10px] text-[#70777E] font-mono">
-          <span className="truncate">{formatBytes(diskSpace?.usedBytes)} used</span>
-          <span className="text-[#ECEFF1] font-semibold flex-shrink-0 ml-1">
-            {stats?.totalFiles || 0} files
-          </span>
-        </div>
-      </div>
+      )}
     </aside>
   );
 }

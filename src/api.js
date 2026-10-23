@@ -9,7 +9,7 @@ export const api = {
     if (isElectron && window.electronAPI.getPathForFile) {
       return window.electronAPI.getPathForFile(file);
     }
-    return file?.path || '';
+    return file?.path || file?.webkitRelativePath || file?.name || '';
   },
 
   // Window Controls
@@ -74,6 +74,9 @@ export const api = {
         const files = Array.from(e.target.files || []);
         resolve(files);
       };
+      input.oncancel = () => {
+        resolve([]);
+      };
       input.click();
     });
   },
@@ -89,13 +92,39 @@ export const api = {
         const files = Array.from(e.target.files || []);
         resolve(files);
       };
+      input.oncancel = () => {
+        resolve([]);
+      };
       input.click();
     });
   },
   showNotification: async (title, body) => {
-    if (isElectron) return window.electronAPI.showNotification(title, body);
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body });
+    // 1. Dispatch custom event for rich in-app toast notification
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('folio-notification', {
+          detail: {
+            id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            title,
+            body,
+            timestamp: Date.now(),
+          },
+        })
+      );
+    }
+
+    // 2. Desktop Electron notification
+    if (isElectron && window.electronAPI?.showNotification) {
+      return window.electronAPI.showNotification(title, body);
+    }
+
+    // 3. Browser native Notification if permission granted
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, { body });
+      } catch (err) {
+        // Handled gracefully via in-app toast
+      }
     } else {
       console.log('[Notification]', title, body);
     }
@@ -122,13 +151,7 @@ export const api = {
   },
   getDiskSpace: async () => {
     if (isElectron) return window.electronAPI.getDiskSpace();
-    return {
-      totalBytes: 500 * 1024 * 1024 * 1024,
-      freeBytes: 92 * 1024 * 1024 * 1024,
-      usedBytes: 408 * 1024 * 1024 * 1024,
-      percentUsed: 81,
-      diskName: 'Macintosh HD',
-    };
+    return null;
   },
 
   // Database operations
@@ -137,33 +160,80 @@ export const api = {
     try {
       const stored = typeof window !== 'undefined' ? localStorage.getItem('folio_browser_files') : null;
       const files = stored ? JSON.parse(stored) : [];
-      const newItems = filePaths.map((fp, idx) => {
+      const newItems = [];
+      const seenFolderPaths = new Set(files.filter((f) => f.category === 'folder').map((f) => f.path));
+
+      filePaths.forEach((fp, idx) => {
         const name = typeof fp === 'string' ? fp.split('/').pop() : fp.name || 'imported_file';
-        const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : 'txt';
-        return {
+        const isFolder = fp.category === 'folder' || fp.isDirectory || (!name.includes('.') && !fp.type);
+        const ext = isFolder ? 'folder' : (name.includes('.') ? name.split('.').pop().toLowerCase() : 'txt');
+        const rawRelPath = typeof fp === 'string' ? fp : (fp.webkitRelativePath ? '/' + fp.webkitRelativePath : '/' + name);
+        const relPath = rawRelPath.startsWith('/') ? rawRelPath : '/' + rawRelPath;
+
+        // Auto-create any parent folders from relative path hierarchy (e.g. /Documents/Projects/file.txt)
+        const segments = relPath.split('/').filter(Boolean);
+        if (segments.length > 1) {
+          let running = '';
+          for (let i = 0; i < segments.length - 1; i++) {
+            running += '/' + segments[i];
+            if (!seenFolderPaths.has(running)) {
+              seenFolderPaths.add(running);
+              newItems.push({
+                id: Date.now() + 50000 + newItems.length,
+                name: segments[i],
+                path: running,
+                size: 0,
+                extension: 'folder',
+                category: 'folder',
+                is_favorite: 0,
+                notes: 'Imported folder directory',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                tags: [],
+              });
+            }
+          }
+        }
+
+        if (isFolder) {
+          if (seenFolderPaths.has(relPath)) return;
+          seenFolderPaths.add(relPath);
+        }
+
+        newItems.push({
           id: Date.now() + idx,
           name,
-          path: typeof fp === 'string' ? fp : '/' + name,
-          size: fp.size || 2048,
+          path: relPath,
+          size: fp.size || (isFolder ? 0 : 2048),
           extension: ext,
-          category: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext)
+          category: isFolder
+            ? 'folder'
+            : ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext)
             ? 'image'
             : ['pdf', 'doc', 'docx', 'txt', 'md', 'csv'].includes(ext)
             ? 'document'
             : ['js', 'jsx', 'ts', 'tsx', 'py', 'json', 'html', 'css'].includes(ext)
             ? 'code'
+            : ['zip', 'tar', 'gz', 'rar', '7z'].includes(ext)
+            ? 'archive'
+            : ['mp4', 'mov', 'mkv', 'webm'].includes(ext)
+            ? 'video'
+            : ['mp3', 'wav', 'flac', 'aac'].includes(ext)
+            ? 'audio'
             : 'other',
           is_favorite: 0,
           notes: '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           tags: [],
-        };
+        });
       });
+
       const updated = [...files, ...newItems];
       localStorage.setItem('folio_browser_files', JSON.stringify(updated));
       return newItems;
     } catch (e) {
+      console.error('Error adding files to browser storage:', e);
       return [];
     }
   },
@@ -179,7 +249,7 @@ export const api = {
         files = files.filter((f) => f.is_favorite);
       }
       if (filters.tagId) {
-        files = files.filter((f) => f.tags && f.tags.some((t) => t.id === filters.tagId));
+        files = files.filter((f) => f.tags && f.tags.some((t) => String(t.id) === String(filters.tagId)));
       }
       if (filters.search) {
         const q = filters.search.toLowerCase();
@@ -195,7 +265,7 @@ export const api = {
     try {
       const stored = localStorage.getItem('folio_browser_files');
       let files = stored ? JSON.parse(stored) : [];
-      files = files.filter((f) => f.id !== fileId);
+      files = files.filter((f) => String(f.id) !== String(fileId));
       localStorage.setItem('folio_browser_files', JSON.stringify(files));
       return true;
     } catch (e) {
@@ -205,10 +275,10 @@ export const api = {
   deleteFiles: async (fileIds) => {
     if (isElectron) return window.electronAPI.deleteFiles(fileIds);
     try {
-      const idsSet = new Set(fileIds);
+      const idsSet = new Set(fileIds.map(String));
       const stored = localStorage.getItem('folio_browser_files');
       let files = stored ? JSON.parse(stored) : [];
-      files = files.filter((f) => !idsSet.has(f.id));
+      files = files.filter((f) => !idsSet.has(String(f.id)));
       localStorage.setItem('folio_browser_files', JSON.stringify(files));
       return true;
     } catch (e) {
@@ -224,7 +294,7 @@ export const api = {
     try {
       const stored = localStorage.getItem('folio_browser_files');
       let files = stored ? JSON.parse(stored) : [];
-      files = files.map((f) => (f.id === fileId ? { ...f, is_favorite: f.is_favorite ? 0 : 1 } : f));
+      files = files.map((f) => (String(f.id) === String(fileId) ? { ...f, is_favorite: f.is_favorite ? 0 : 1 } : f));
       localStorage.setItem('folio_browser_files', JSON.stringify(files));
       return true;
     } catch (e) {
@@ -236,7 +306,7 @@ export const api = {
     try {
       const stored = localStorage.getItem('folio_browser_files');
       let files = stored ? JSON.parse(stored) : [];
-      files = files.map((f) => (f.id === fileId ? { ...f, notes } : f));
+      files = files.map((f) => (String(f.id) === String(fileId) ? { ...f, notes } : f));
       localStorage.setItem('folio_browser_files', JSON.stringify(files));
       return true;
     } catch (e) {

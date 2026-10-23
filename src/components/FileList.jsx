@@ -4,7 +4,7 @@ import {
   Eye, FileText, Image, Code2, Music, Video, Archive, File, 
   Trash2, Copy, X, Plus, RefreshCw, ChevronDown, ChevronRight,
   MoreHorizontal, FolderTree, ChevronsDownUp, ChevronsUpDown,
-  Layers, Tag, Calendar, Check
+  Layers, Tag, Calendar, Check, CheckSquare
 } from 'lucide-react';
 import { api } from '../api';
 import { getFolioUrl } from '../utils/url';
@@ -744,62 +744,87 @@ export default function FileList({
     return () => window.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  const isItemChecked = React.useCallback(
+    (id) => selectedIds.has(String(id)),
+    [selectedIds]
+  );
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Cmd/Ctrl + K: Focus Search
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
         e.preventDefault();
         searchInputRef.current?.focus();
       } 
-      // Cmd/Ctrl + A: Select All Files (when not typing in an input/textarea)
-      else if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A')) {
+      // Cmd/Ctrl + A: Select All Files and Folders
+      else if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA')) {
         const activeTag = document.activeElement?.tagName;
-        const isEditing = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || document.activeElement?.isContentEditable;
-        if (!isEditing && files.length > 0) {
-          e.preventDefault();
-          setSelectedIds(new Set(files.map((f) => f.id)));
+        const activeEl = document.activeElement;
+        const isTextInput = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeEl?.isContentEditable;
+        
+        // If the user is inside an input with text, allow default text selection. Otherwise select all files & folders.
+        if (!isTextInput || (activeEl && !activeEl.value)) {
+          if (files && files.length > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            setSelectedIds(new Set(files.map((f) => String(f.id))));
+          }
         }
       } 
       // Escape: Clear Selection
       else if (e.key === 'Escape') {
         if (selectedIds.size > 0) {
+          e.preventDefault();
           setSelectedIds(new Set());
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [files, selectedIds, setSelectedIds]);
 
-  const allSelected = files.length > 0 && selectedIds.size === files.length;
-  const isIndeterminate = selectedIds.size > 0 && selectedIds.size < files.length;
+  const allSelected = files.length > 0 && files.every((f) => isItemChecked(f.id));
+  const isIndeterminate = files.length > 0 && selectedIds.size > 0 && !allSelected;
 
   const handleToggleSelectAll = () => {
     if (allSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(files.map((f) => f.id)));
+      setSelectedIds(new Set(files.map((f) => String(f.id))));
     }
   };
 
   const handleToggleSelectItem = (id, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
+    const sId = String(id);
     const next = new Set(selectedIds);
-    if (next.has(id)) {
-      next.delete(id);
+
+    // Identify if clicked item is a folder with children
+    const targetFile = files?.find((f) => String(f.id) === sId);
+    const isFolder = targetFile && (targetFile.category === 'folder' || targetFile.extension === 'folder');
+    const folderChildren = isFolder ? getFolderChildren(targetFile.path) : [];
+
+    if (next.has(sId)) {
+      next.delete(sId);
+      if (folderChildren.length > 0) {
+        folderChildren.forEach((child) => next.delete(String(child.id)));
+      }
     } else {
-      next.add(id);
+      next.add(sId);
+      if (folderChildren.length > 0) {
+        folderChildren.forEach((child) => next.add(String(child.id)));
+      }
     }
     setSelectedIds(next);
   };
 
   const handleCopySelectedPaths = async () => {
     const paths = files
-      .filter((f) => selectedIds.has(f.id))
+      .filter((f) => isItemChecked(f.id))
       .map((f) => f.path)
       .join('\n');
     await api.copyToClipboard(paths);
-    api.showNotification('Folio Clipboard', `Copied ${selectedIds.size} path(s) to clipboard.`);
+    api.showNotification('Folio Clipboard', `Copied path(s) to clipboard.`);
   };
 
   return (
@@ -814,6 +839,11 @@ export default function FileList({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                e.currentTarget.blur();
+              }
+            }}
             placeholder="Search by name, tags, or notes..."
             className="w-full bg-[#191D21] border border-[#30363C] rounded pl-8 pr-12 py-1 text-xs text-[#ECEFF1] placeholder-[#70777E] focus:outline-none focus:border-[#B7C7D8] transition-colors"
           />
@@ -1012,6 +1042,27 @@ export default function FileList({
             )}
           </div>
 
+          {/* Select All Toggle Action (⌘A shortcut indicator) */}
+          {files.length > 0 && (
+            <button
+              type="button"
+              onClick={handleToggleSelectAll}
+              title={allSelected ? 'Deselect All (Esc)' : 'Select All (⌘A)'}
+              className={`flex items-center space-x-1 px-2 py-1 rounded text-xs border transition-colors cursor-pointer select-none ${
+                allSelected
+                  ? 'bg-[#252B31] border-[#B7C7D8] text-[#ECEFF1]'
+                  : selectedIds.size > 0
+                  ? 'bg-[#191D21] border-[#70777E] text-[#ECEFF1]'
+                  : 'bg-[#191D21] border-[#30363C] text-[#92999F] hover:text-[#ECEFF1] hover:border-[#70777E]/50'
+              }`}
+            >
+              <CheckSquare className="w-3.5 h-3.5 text-[#B7C7D8]" />
+              <span className="hidden sm:inline font-medium">
+                {allSelected ? 'Deselect' : 'Select All'}
+              </span>
+            </button>
+          )}
+
           {/* Grid / List Switcher */}
           <div className="flex items-center bg-[#191D21] border border-[#30363C] rounded p-0.5">
             <button
@@ -1057,13 +1108,16 @@ export default function FileList({
                 : 'Drag and drop files from Finder to begin indexing.'}
             </p>
             {!searchQuery && (
-              <button
-                onClick={onAddFilesClick}
-                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-[#B7C7D8] hover:bg-[#C8D6E5] text-[#101214] text-xs font-semibold shadow-sm transition-all active:scale-95 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Import Files or Folders</span>
-              </button>
+              <div className="flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={onAddFilesClick}
+                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-[#B7C7D8] hover:bg-[#C8D6E5] text-[#101214] text-xs font-semibold shadow-sm transition-all active:scale-95 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Import Files or Folders</span>
+                </button>
+              </div>
             )}
           </div>
         ) : viewMode === 'grid' ? (
@@ -1108,7 +1162,7 @@ export default function FileList({
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                       {group.files.map((file) => {
                         const isSelected = selectedFileId === file.id;
-                        const isChecked = selectedIds.has(file.id);
+                        const isChecked = isItemChecked(file.id);
                         const isFolder = file.category === 'folder' || file.extension === 'folder';
                         const isFolderExpanded = expandedFolders.has(file.id);
                         const folderChildren = isFolder ? getFolderChildren(file.path) : [];
@@ -1362,7 +1416,7 @@ export default function FileList({
                       {/* File rows (hidden when group is collapsed) */}
                       {!isCollapsed && group.files.map((file) => {
                         const isSelected = selectedFileId === file.id;
-                        const isChecked = selectedIds.has(file.id);
+                        const isChecked = isItemChecked(file.id);
                         const isFolder = file.category === 'folder' || file.extension === 'folder';
                         const isFolderExpanded = expandedFolders.has(file.id);
                         const folderChildren = isFolder ? getFolderChildren(file.path) : [];
@@ -1390,12 +1444,13 @@ export default function FileList({
                               <td className="py-2 px-2 text-center w-9">
                                 <div
                                   onClick={(e) => handleToggleSelectItem(file.id, e)}
-                                  className="flex items-center justify-center"
+                                  className="flex items-center justify-center cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
                                     checked={isChecked}
-                                    onChange={() => {}}
+                                    onChange={(e) => handleToggleSelectItem(file.id, e)}
+                                    onClick={(e) => e.stopPropagation()}
                                     className="w-3.5 h-3.5 rounded border-[#30363C] bg-[#191D21] text-[#B7C7D8] focus:ring-0 cursor-pointer"
                                   />
                                 </div>
@@ -1490,7 +1545,7 @@ export default function FileList({
                               folderChildren.length > 0 ? (
                                 folderChildren.map((child) => {
                                   const isChildSelected = selectedFileId === child.id;
-                                  const isChildChecked = selectedIds.has(child.id);
+                                  const isChildChecked = isItemChecked(child.id);
                                   const subFolder = getSubFolderName(file.path, child.path);
 
                                   return (
@@ -1517,12 +1572,13 @@ export default function FileList({
                                       <td className="py-1.5 px-2 text-center w-9">
                                         <div
                                           onClick={(e) => handleToggleSelectItem(child.id, e)}
-                                          className="flex items-center justify-center pl-2"
+                                          className="flex items-center justify-center pl-2 cursor-pointer"
                                         >
                                           <input
                                             type="checkbox"
                                             checked={isChildChecked}
-                                            onChange={() => {}}
+                                            onChange={(e) => handleToggleSelectItem(child.id, e)}
+                                            onClick={(e) => e.stopPropagation()}
                                             className="w-3.5 h-3.5 rounded border-[#30363C] bg-[#191D21] text-[#B7C7D8] focus:ring-0 cursor-pointer"
                                           />
                                         </div>
