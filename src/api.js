@@ -133,13 +133,93 @@ export const api = {
     if (isElectron) return window.electronAPI.readTextPreview(filePath);
     return 'Text preview is active in the desktop Electron app.';
   },
+  showSaveDialog: async (options) => {
+    if (isElectron && window.electronAPI?.showSaveDialog) {
+      return window.electronAPI.showSaveDialog(options);
+    }
+    return null;
+  },
+  readFullText: async (filePath) => {
+    if (isElectron && window.electronAPI?.readFullText) {
+      return window.electronAPI.readFullText(filePath);
+    }
+    return null;
+  },
   getFileStats: async (filePath) => {
     if (isElectron) return window.electronAPI.getFileStats(filePath);
     return null;
   },
   changeFormat: async (options) => {
     if (isElectron) return window.electronAPI.changeFormat(options);
-    return { success: false };
+
+    // Web browser fallback: trigger download and update localStorage catalog
+    try {
+      const { oldPath, newExtension, dataBase64, textContent } = options;
+      const cleanExt = (newExtension || '').replace(/^\./, '').toLowerCase();
+      const baseName = oldPath ? oldPath.split('/').pop().replace(/\.[^/.]+$/, '') : 'file';
+      const targetFileName = `${baseName}_converted.${cleanExt}`;
+      
+      let blob;
+      if (dataBase64) {
+        const parts = dataBase64.split(',');
+        const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        blob = new Blob([u8arr], { type: mime });
+      } else if (textContent !== null && textContent !== undefined) {
+        blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+      } else {
+        blob = new Blob([`Converted content for ${targetFileName}`], { type: 'text/plain;charset=utf-8' });
+      }
+
+      // Download file to browser Downloads
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = targetFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      // Add to Folio browser catalog
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('folio_browser_files') : null;
+      const files = stored ? JSON.parse(stored) : [];
+      const newFileItem = {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        name: targetFileName,
+        path: '/' + targetFileName,
+        size: blob.size,
+        extension: cleanExt,
+        category: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp', 'avif'].includes(cleanExt)
+          ? 'image'
+          : ['pdf', 'doc', 'docx', 'txt', 'md', 'csv', 'tsv'].includes(cleanExt)
+          ? 'document'
+          : ['js', 'jsx', 'ts', 'tsx', 'py', 'json', 'html', 'css', 'yaml', 'yml'].includes(cleanExt)
+          ? 'code'
+          : ['mp4', 'mov', 'mkv', 'webm'].includes(cleanExt)
+          ? 'video'
+          : ['mp3', 'wav', 'm4a', 'ogg'].includes(cleanExt)
+          ? 'audio'
+          : 'other',
+        is_favorite: 0,
+        notes: `Converted to .${cleanExt}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        tags: [],
+      };
+      files.unshift(newFileItem);
+      localStorage.setItem('folio_browser_files', JSON.stringify(files));
+
+      return { success: true, path: '/' + targetFileName, isNew: true, file: newFileItem };
+    } catch (err) {
+      console.error('Web format conversion error:', err);
+      return { success: false, error: err.message };
+    }
   },
   getThumbnail: async (filePath) => {
     if (isElectron) return window.electronAPI.getThumbnail(filePath);

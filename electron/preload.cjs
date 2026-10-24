@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFilesDialog: () => ipcRenderer.invoke('os:selectFilesDialog'),
   selectFolderDialog: () => ipcRenderer.invoke('os:selectFolderDialog'),
   showNotification: (title, body) => ipcRenderer.invoke('os:showNotification', { title, body }),
+  showSaveDialog: (options) => ipcRenderer.invoke('os:showSaveDialog', options),
+  readFullText: (filePath) => ipcRenderer.invoke('os:readFullText', filePath),
   readTextPreview: (filePath) => ipcRenderer.invoke('os:readTextPreview', filePath),
   getFileStats: (filePath) => ipcRenderer.invoke('os:getFileStats', filePath),
   changeFormat: (options) => ipcRenderer.invoke('os:changeFormat', options),

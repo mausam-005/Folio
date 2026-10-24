@@ -233,6 +233,26 @@ function setupIPC() {
     return result.canceled ? [] : result.filePaths;
   });
 
+  ipcMain.handle('os:showSaveDialog', async (_, options = {}) => {
+    if (!mainWindow) return null;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: options.title || 'Save Converted File',
+      defaultPath: options.defaultPath,
+      buttonLabel: options.buttonLabel || 'Save',
+    });
+    return result.canceled ? null : result.filePath;
+  });
+
+  ipcMain.handle('os:readFullText', async (_, filePath) => {
+    try {
+      if (!filePath || !fs.existsSync(filePath)) return null;
+      return fs.readFileSync(filePath, 'utf8');
+    } catch (err) {
+      console.error('Failed to read full text:', err);
+      return null;
+    }
+  });
+
   ipcMain.handle('os:showNotification', (_, { title, body }) => {
     if (Notification.isSupported()) {
       new Notification({
@@ -381,7 +401,7 @@ function setupIPC() {
     }
   });
 
-  ipcMain.handle('os:changeFormat', async (_, { fileId, oldPath, newExtension, inPlace = true, dataBase64 = null }) => {
+  ipcMain.handle('os:changeFormat', async (_, { fileId, oldPath, newExtension, inPlace = true, dataBase64 = null, destinationPath = null, textContent = null }) => {
     try {
       if (!fs.existsSync(oldPath)) {
         throw new Error('Original file does not exist on disk.');
@@ -390,15 +410,25 @@ function setupIPC() {
       const extWithDot = path.extname(oldPath);
       const baseName = path.basename(oldPath, extWithDot);
       const cleanExt = newExtension.replace(/^\./, '').toLowerCase();
-      const newName = `${baseName}.${cleanExt}`;
-      let targetPath = path.join(dir, newName);
-
-      if (!inPlace && fs.existsSync(targetPath)) {
-        targetPath = path.join(dir, `${baseName}_converted_${Date.now()}.${cleanExt}`);
+      
+      let targetPath;
+      if (destinationPath) {
+        targetPath = destinationPath;
+      } else if (inPlace) {
+        targetPath = path.join(dir, `${baseName}.${cleanExt}`);
+      } else {
+        const candidate = path.join(dir, `${baseName}.${cleanExt}`);
+        if (candidate !== oldPath && !fs.existsSync(candidate)) {
+          targetPath = candidate;
+        } else {
+          targetPath = path.join(dir, `${baseName}_converted_${Date.now()}.${cleanExt}`);
+        }
       }
 
+      const newCategory = dbManager.categorizeExtension(cleanExt);
+
       if (dataBase64) {
-        // Base64 image conversion (PNG / JPEG / WebP)
+        // Base64 image conversion (PNG / JPEG / WebP / AVIF / BMP)
         const base64Data = dataBase64.replace(/^data:image\/\w+;base64,/, '');
         const buffer = Buffer.from(base64Data, 'base64');
         fs.writeFileSync(targetPath, buffer);
@@ -407,7 +437,25 @@ function setupIPC() {
           if (oldPath !== targetPath && fs.existsSync(oldPath)) {
             fs.unlinkSync(oldPath);
           }
-          const newCategory = dbManager.categorizeExtension(cleanExt);
+          dbManager.updateFileInfo(fileId, {
+            name: path.basename(targetPath),
+            path: targetPath,
+            extension: cleanExt,
+            category: newCategory,
+          });
+          return { success: true, path: targetPath, isNew: false };
+        } else {
+          const added = dbManager.addFiles([targetPath]);
+          return { success: true, path: targetPath, isNew: true, file: added[0] };
+        }
+      } else if (textContent !== null && typeof textContent === 'string') {
+        // Converted text content (e.g. JSON <-> CSV, Markdown <-> HTML)
+        fs.writeFileSync(targetPath, textContent, 'utf8');
+
+        if (inPlace) {
+          if (oldPath !== targetPath && fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
           dbManager.updateFileInfo(fileId, {
             name: path.basename(targetPath),
             path: targetPath,
@@ -420,16 +468,21 @@ function setupIPC() {
           return { success: true, path: targetPath, isNew: true, file: added[0] };
         }
       } else {
-        // Safe file rename / extension change
-        fs.renameSync(oldPath, targetPath);
-        const newCategory = dbManager.categorizeExtension(cleanExt);
-        dbManager.updateFileInfo(fileId, {
-          name: path.basename(targetPath),
-          path: targetPath,
-          extension: cleanExt,
-          category: newCategory,
-        });
-        return { success: true, path: targetPath, isNew: false };
+        // Direct file operation (rename for inPlace, safe copy for export copy)
+        if (inPlace) {
+          fs.renameSync(oldPath, targetPath);
+          dbManager.updateFileInfo(fileId, {
+            name: path.basename(targetPath),
+            path: targetPath,
+            extension: cleanExt,
+            category: newCategory,
+          });
+          return { success: true, path: targetPath, isNew: false };
+        } else {
+          fs.copyFileSync(oldPath, targetPath);
+          const added = dbManager.addFiles([targetPath]);
+          return { success: true, path: targetPath, isNew: true, file: added[0] };
+        }
       }
     } catch (err) {
       console.error('Failed to change file format:', err);
