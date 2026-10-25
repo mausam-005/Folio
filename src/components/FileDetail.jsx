@@ -36,6 +36,7 @@ export default function FileDetail({
   onOpenFormatModal,
   onUpdateNotes,
   width = 320,
+  isOverlay = false,
 }) {
   const [copied, setCopied] = useState(false);
   const [notes, setNotes] = useState('');
@@ -191,8 +192,10 @@ export default function FileDetail({
 
   return (
     <aside 
-      style={{ width: `${width}px` }}
-      className="bg-[#15181B] border-l border-[#30363C] flex flex-col h-full overflow-hidden select-none z-20 text-xs flex-shrink-0"
+      style={isOverlay ? undefined : { width: `${width}px` }}
+      className={`bg-[#15181B] border-l border-[#30363C] flex flex-col h-full overflow-hidden select-none text-xs flex-shrink-0 ${
+        isOverlay ? 'w-full shadow-2xl' : 'z-20'
+      }`}
     >
       {/* Header */}
       <div className="p-3 border-b border-[#30363C] flex items-center justify-between bg-[#101214]">

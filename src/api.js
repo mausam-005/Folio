@@ -43,7 +43,7 @@ export const api = {
   openPath: async (filePath) => {
     try {
       if (isElectron) return await window.electronAPI.openPath(filePath);
-      console.log('Open file action in browser demo:', filePath);
+      api.showNotification('Open File', 'Opening files in native desktop apps is enabled in the Folio macOS Desktop app.');
     } catch (err) {
       if (isElectron) {
         window.electronAPI.showNotification('File Not Found', `The file at "${filePath}" is no longer on disk.`);
@@ -53,7 +53,10 @@ export const api = {
   revealInFinder: async (filePath) => {
     try {
       if (isElectron) return await window.electronAPI.revealInFinder(filePath);
-      console.log('Reveal in Finder action in browser demo:', filePath);
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(filePath);
+      }
+      api.showNotification('Path Copied', 'Direct Finder integration is active in the Folio macOS Desktop app.');
     } catch (err) {
       if (isElectron) {
         window.electronAPI.showNotification('File Not Found', `Cannot locate "${filePath}" in Finder.`);

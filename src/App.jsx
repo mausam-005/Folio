@@ -104,6 +104,33 @@ export default function App() {
     return saved ? Math.max(240, Math.min(540, parseInt(saved, 10))) : 320;
   });
 
+  // Window width tracking for responsive layouts
+  const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [desktopSidebarVisible, setDesktopSidebarVisible] = useState(true);
+
+  useEffect(() => {
+    const handleWinResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleWinResize);
+    return () => window.removeEventListener('resize', handleWinResize);
+  }, []);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (mobileSidebarOpen) {
+          setMobileSidebarOpen(false);
+        } else if (selectedFile && windowWidth < 1024) {
+          setSelectedFile(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [mobileSidebarOpen, selectedFile, windowWidth]);
+
+  const isSmallScreen = windowWidth < 1024;
+
   const handleLeftResizeStart = (e) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -495,32 +522,77 @@ export default function App() {
         stats={stats}
         onOpenAbout={() => setAboutOpen(true)}
         isFullScreen={isFullScreen}
+        onToggleSidebar={() => {
+          if (isSmallScreen) {
+            setMobileSidebarOpen((prev) => !prev);
+          } else {
+            setDesktopSidebarVisible((prev) => !prev);
+          }
+        }}
       />
 
       {/* Main Workspace Body */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Navigation Sidebar */}
-        <Sidebar
-          width={leftSidebarWidth}
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-          selectedTagId={selectedTagId}
-          onSelectTag={setSelectedTagId}
-          tags={tags}
-          onOpenTagModal={() => setTagModalOpen(true)}
-          onDeleteTag={handleDeleteTag}
-          stats={stats}
-          categoryCounts={categoryCounts}
-        />
+        {/* Desktop Left Navigation Sidebar */}
+        {!isSmallScreen && desktopSidebarVisible && (
+          <>
+            <Sidebar
+              width={leftSidebarWidth}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+              selectedTagId={selectedTagId}
+              onSelectTag={setSelectedTagId}
+              tags={tags}
+              onOpenTagModal={() => setTagModalOpen(true)}
+              onDeleteTag={handleDeleteTag}
+              stats={stats}
+              categoryCounts={categoryCounts}
+            />
 
-        {/* Left Sidebar Resize Handle */}
-        <div
-          onMouseDown={handleLeftResizeStart}
-          className="w-1 bg-[#30363C]/80 hover:bg-[#B7C7D8] cursor-col-resize transition-colors z-20 flex-shrink-0 relative group select-none"
-          title="Drag to resize sidebar"
-        >
-          <div className="absolute inset-y-0 -left-1 -right-1" />
-        </div>
+            {/* Left Sidebar Resize Handle */}
+            <div
+              onMouseDown={handleLeftResizeStart}
+              className="w-1 bg-[#30363C]/80 hover:bg-[#B7C7D8] cursor-col-resize transition-colors z-20 flex-shrink-0 relative group select-none"
+              title="Drag to resize sidebar"
+            >
+              <div className="absolute inset-y-0 -left-1 -right-1" />
+            </div>
+          </>
+        )}
+
+        {/* Mobile / Tablet Left Navigation Sidebar (Slide-over Drawer) */}
+        {isSmallScreen && mobileSidebarOpen && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black/70 backdrop-blur-xs z-40 transition-opacity animate-in fade-in duration-150"
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+            <div className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] shadow-2xl animate-in slide-in-from-left duration-200">
+              <Sidebar
+                selectedCategory={selectedCategory}
+                onSelectCategory={(cat) => {
+                  setSelectedCategory(cat);
+                  setMobileSidebarOpen(false);
+                }}
+                selectedTagId={selectedTagId}
+                onSelectTag={(tagId) => {
+                  setSelectedTagId(tagId);
+                  setMobileSidebarOpen(false);
+                }}
+                tags={tags}
+                onOpenTagModal={() => {
+                  setTagModalOpen(true);
+                  setMobileSidebarOpen(false);
+                }}
+                onDeleteTag={handleDeleteTag}
+                stats={stats}
+                categoryCounts={categoryCounts}
+                isMobileDrawer={true}
+                onClose={() => setMobileSidebarOpen(false)}
+              />
+            </div>
+          </>
+        )}
 
         {/* Central File Browser */}
         <FileList
@@ -541,10 +613,12 @@ export default function App() {
           onAddFilesClick={handleImportDialog}
           selectedIds={selectedIds}
           setSelectedIds={setSelectedIds}
+          isSmallScreen={isSmallScreen}
+          onOpenSidebar={() => setMobileSidebarOpen(true)}
         />
 
-        {/* Right Sidebar Resize Handle & File Detail Drawer */}
-        {selectedFile && (
+        {/* Desktop Right Sidebar Resize Handle & File Detail Drawer */}
+        {selectedFile && !isSmallScreen && (
           <>
             <div
               onMouseDown={handleRightResizeStart}
@@ -566,6 +640,30 @@ export default function App() {
               onOpenFormatModal={(file) => setFormatFile(file)}
               onUpdateNotes={handleUpdateNotes}
             />
+          </>
+        )}
+
+        {/* Mobile / Tablet File Detail Drawer (Slide-over with Backdrop) */}
+        {selectedFile && isSmallScreen && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black/70 backdrop-blur-xs z-40 transition-opacity animate-in fade-in duration-150"
+              onClick={() => setSelectedFile(null)}
+            />
+            <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] max-w-[92vw] shadow-2xl animate-in slide-in-from-right duration-200">
+              <FileDetail
+                file={selectedFile}
+                onClose={() => setSelectedFile(null)}
+                allTags={tags}
+                onAttachTag={handleAttachTag}
+                onDetachTag={handleDetachTag}
+                onRequestDeleteFile={handleRequestDeleteFile}
+                onOpenPreview={(file) => setPreviewFile(file)}
+                onOpenFormatModal={(file) => setFormatFile(file)}
+                onUpdateNotes={handleUpdateNotes}
+                isOverlay={true}
+              />
+            </div>
           </>
         )}
       </div>

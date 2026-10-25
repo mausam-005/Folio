@@ -67,12 +67,12 @@ export default function QuickPreview({ file, onClose }) {
   if (!file) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-6">
-      <div className="bg-[#15181B] border border-[#30363C] rounded-lg w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-2.5 sm:p-4 md:p-6 animate-in fade-in duration-150">
+      <div className="bg-[#15181B] border border-[#30363C] rounded-xl w-full max-w-4xl max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden shadow-2xl">
         {/* Modal Header */}
-        <div className="h-11 border-b border-[#30363C] px-4 flex items-center justify-between bg-[#101214]">
-          <div className="flex items-center space-x-2.5 min-w-0">
-            <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-[#191D21] text-[#92999F] font-semibold border border-[#30363C]">
+        <div className="h-11 border-b border-[#30363C] px-3 sm:px-4 flex items-center justify-between bg-[#101214] gap-2">
+          <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0">
+            <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-[#191D21] text-[#92999F] font-semibold border border-[#30363C] flex-shrink-0">
               {file.extension || file.category}
             </span>
             <h3 className="text-xs font-semibold text-[#ECEFF1] truncate" title={file.name}>
@@ -80,24 +80,27 @@ export default function QuickPreview({ file, onClose }) {
             </h3>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => api.quickLook(file.path)}
-              className="px-2.5 py-1 rounded bg-[#191D21] hover:bg-[#252B31] text-[#ECEFF1] text-xs font-medium border border-[#30363C] transition-colors"
-              title="Open in macOS Quick Look"
-            >
-              Quick Look
-            </button>
+          <div className="flex items-center space-x-1.5 sm:space-x-2 flex-shrink-0">
+            {api.isElectron && (
+              <button
+                onClick={() => api.quickLook(file.path)}
+                className="hidden md:inline-flex px-2 sm:px-2.5 py-1 rounded bg-[#191D21] hover:bg-[#252B31] text-[#ECEFF1] text-xs font-medium border border-[#30363C] transition-colors"
+                title="Open in macOS Quick Look"
+              >
+                Quick Look
+              </button>
+            )}
             <button
               onClick={() => api.openPath(file.path)}
-              className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-[#B7C7D8] hover:bg-[#C8D6E5] text-[#101214] text-xs font-semibold transition-colors"
+              className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 py-1 rounded-lg bg-[#B7C7D8] hover:bg-[#C8D6E5] text-[#101214] text-xs font-semibold transition-colors shadow-sm"
+              title="Open file"
             >
               <ExternalLink className="w-3 h-3 stroke-[2.5]" />
-              <span>Open in Default App</span>
+              <span className="hidden sm:inline">Open</span>
             </button>
             <button
               onClick={() => api.revealInFinder(file.path)}
-              className="p-1.5 rounded text-[#70777E] hover:text-[#ECEFF1] hover:bg-[#191D21] transition-colors"
+              className="hidden xs:inline-flex p-1.5 rounded text-[#70777E] hover:text-[#ECEFF1] hover:bg-[#191D21] transition-colors"
               title="Reveal in Finder"
             >
               <FolderOpen className="w-3.5 h-3.5" />
@@ -107,7 +110,7 @@ export default function QuickPreview({ file, onClose }) {
               className="p-1.5 rounded text-[#70777E] hover:text-[#ECEFF1] hover:bg-[#191D21] transition-colors"
               title="Close (Esc)"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>

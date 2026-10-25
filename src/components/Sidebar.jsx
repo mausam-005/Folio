@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Files, Star, Folder, FileText, Image, Code2, Music, Video, Archive, Plus, Trash2, HardDrive
+  Files, Star, Folder, FileText, Image, Code2, Music, Video, Archive, Plus, Trash2, HardDrive, X
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -35,6 +35,8 @@ export default function Sidebar({
   stats,
   categoryCounts = {},
   width = 200,
+  isMobileDrawer = false,
+  onClose = () => {},
 }) {
   const [diskSpace, setDiskSpace] = useState(null);
 
@@ -48,9 +50,24 @@ export default function Sidebar({
 
   return (
     <aside 
-      style={{ width: `${width}px` }}
-      className="bg-[#15181B] border-r border-[#30363C] flex flex-col justify-between h-full select-none text-xs flex-shrink-0"
+      style={isMobileDrawer ? undefined : { width: `${width}px` }}
+      className={`bg-[#15181B] border-r border-[#30363C] flex flex-col justify-between h-full select-none text-xs flex-shrink-0 ${
+        isMobileDrawer ? 'w-full shadow-2xl' : ''
+      }`}
     >
+      {/* Mobile Drawer Header */}
+      {isMobileDrawer && (
+        <div className="px-3.5 py-3 border-b border-[#30363C] flex items-center justify-between bg-[#101214]">
+          <span className="text-xs font-semibold text-[#ECEFF1] tracking-wide">Library & Tags</span>
+          <button
+            onClick={onClose}
+            className="p-1 rounded text-[#92999F] hover:text-[#ECEFF1] hover:bg-[#191D21] transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
         {/* Categories Section */}
         <div>

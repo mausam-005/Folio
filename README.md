@@ -59,11 +59,13 @@
 
 ## Highlights
 
-- **Intelligent Grouping:** Group files by folder hierarchy, file categories, or modification date.
-- **Tagging & Filtering:** Create custom color-coded tags, mark favorites, and search using multiple keywords.
-- **Native Desktop Access:** Reveal files in Finder, open them in their default applications, and import using OS drag-and-drop.
-- **File Inspector:** Inspect file metadata, word and line counts, and supported format conversion options.
-- **Local-First & Fast:** Keep catalog data locally with SQLite, without requiring a cloud service.
+- **Responsive Workspace:** Adaptive interface engineered for desktop, tablet, and mobile screens with slide-over drawers, auto-filling fluid grids, and responsive toolbars.
+- **Dual Runtime Architecture:** Runs as a native macOS Electron desktop application with local filesystem access, or as a standalone web app with in-browser client storage.
+- **Format Converter & Exporter:** Transform images (PNG, JPEG, WebP, AVIF), documents (JSON, CSV, TSV, Markdown, HTML, RTF), and code formats with destination directory selection.
+- **Intelligent Grouping:** Group cataloged items by folder hierarchy, file category, or modification date.
+- **Tagging & Instant Filtering:** Organize assets with custom color tags, favorites, and real-time search (Command-K).
+- **Native macOS Integration:** Direct Finder reveal, default application launching, and drag-and-drop import.
+- **Local-First SQLite Engine:** Fast, persistent catalog indexing without external cloud dependencies.
 
 ---
 
@@ -127,7 +129,12 @@ graph TD
 git clone https://github.com/mausam-005/Folio.git
 cd Folio
 npm install
+
+# Run both Web and Desktop (Electron):
 npm run dev
+
+# Or run the Web App only:
+npm run dev:vite
 ```
 
 #### Step-by-Step Installation

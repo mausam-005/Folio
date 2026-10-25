@@ -168,10 +168,10 @@ export default function FormatModal({ file, isOpen, onClose, onConverted }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-      <div className="bg-[#15181B] border border-[#30363C] rounded-xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-2.5 sm:p-4 backdrop-blur-sm animate-fade-in">
+      <div className="bg-[#15181B] border border-[#30363C] rounded-xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
         {/* Modal Header */}
-        <div className="px-5 py-3.5 border-b border-[#30363C] flex items-center justify-between bg-[#101214]">
+        <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-[#30363C] flex items-center justify-between bg-[#101214]">
           <div className="flex items-center space-x-2">
             <RefreshCw className="w-4 h-4 text-[#B7C7D8]" />
             <h3 className="text-sm font-semibold text-[#ECEFF1]">Change File Format</h3>
@@ -185,7 +185,7 @@ export default function FormatModal({ file, isOpen, onClose, onConverted }) {
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1 text-xs">
+        <div className="p-3.5 sm:p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1 text-xs">
           {successResult ? (
             /* ================= SUCCESS VIEW ================= */
             <div className="py-4 space-y-5 text-center">
@@ -254,7 +254,7 @@ export default function FormatModal({ file, isOpen, onClose, onConverted }) {
                 <label className="block text-xs font-medium text-[#92999F] mb-1.5">
                   Select Format Category
                 </label>
-                <div className="grid grid-cols-5 gap-1.5 p-1 bg-[#101214] border border-[#30363C] rounded-lg">
+                <div className="grid grid-cols-5 gap-1 sm:gap-1.5 p-1 bg-[#101214] border border-[#30363C] rounded-lg">
                   {[
                     { key: 'image', label: 'Images', icon: ImageIcon },
                     { key: 'document', label: 'Docs', icon: FileText },
@@ -272,14 +272,14 @@ export default function FormatModal({ file, isOpen, onClose, onConverted }) {
                           setActiveCategory(cat.key);
                           setError('');
                         }}
-                        className={`flex items-center justify-center space-x-1.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                        className={`flex flex-col sm:flex-row items-center justify-center sm:space-x-1.5 py-1.5 sm:py-1.5 px-0.5 rounded-md text-[10px] sm:text-[11px] font-medium transition-colors ${
                           isActive
                             ? 'bg-[#B7C7D8] text-[#101214] font-semibold'
                             : 'text-[#92999F] hover:text-[#ECEFF1] hover:bg-[#191D21]'
                         }`}
                       >
-                        <Icon className="w-3.5 h-3.5" />
-                        <span>{cat.label}</span>
+                        <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate">{cat.label}</span>
                       </button>
                     );
                   })}
@@ -303,7 +303,7 @@ export default function FormatModal({ file, isOpen, onClose, onConverted }) {
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {presets.map((item) => {
                     const isSelected = targetExt === item.ext;
                     const isCurrent = currentExt === item.ext;

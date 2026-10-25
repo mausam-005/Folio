@@ -208,17 +208,17 @@ function FileRowActionBar({
   const isMenuOpen = activeActionId === file.id;
 
   return (
-    <div className="flex items-center justify-end space-x-1.5 flex-shrink-0">
-      {/* Eye button (Quick Preview) */}
+    <div className="flex items-center justify-end space-x-1 sm:space-x-1.5 flex-shrink-0">
+      {/* Eye button (Quick Preview - hidden on mobile, available in ••• menu) */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onOpenPreview(file);
         }}
         title="Quick Preview"
-        className="p-1 rounded text-[#92999F] hover:text-[#ECEFF1] hover:bg-[#252B31] transition-colors flex-shrink-0"
+        className="hidden sm:inline-flex p-1 rounded text-[#92999F] hover:text-[#ECEFF1] hover:bg-[#252B31] transition-colors flex-shrink-0"
       >
-        <EyeActionIcon className="w-4 h-4" />
+        <EyeActionIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
       </button>
 
       {/* Folder button (Reveal in Finder) */}
@@ -230,7 +230,7 @@ function FileRowActionBar({
         title="Reveal in Finder"
         className="p-1 rounded text-[#92999F] hover:text-[#ECEFF1] hover:bg-[#252B31] transition-colors flex-shrink-0"
       >
-        <FolderActionIcon className="w-4 h-4" />
+        <FolderActionIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
       </button>
 
       {/* Squircle Pill ••• button matching screenshot */}
@@ -491,6 +491,8 @@ export default function FileList({
   onAddFolderClick,
   selectedIds,
   setSelectedIds,
+  isSmallScreen = false,
+  onOpenSidebar = () => {},
 }) {
   const [activeActionId, setActiveActionId] = React.useState(null);
   const [isGroupMenuOpen, setIsGroupMenuOpen] = React.useState(false);
@@ -830,9 +832,9 @@ export default function FileList({
   return (
     <div className="flex-1 min-w-0 flex flex-col h-full bg-[#101214] overflow-hidden relative">
       {/* Top Filter and Search Bar */}
-      <div className="px-4 py-3 border-b border-[#30363C] flex flex-wrap items-center justify-between gap-3 bg-[#15181B] z-10">
+      <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-[#30363C] flex flex-wrap items-center justify-between gap-2.5 bg-[#15181B] z-10">
         {/* Search Input with Cmd+K hint */}
-        <div className="relative flex-1 min-w-[220px] max-w-sm">
+        <div className="relative flex-1 min-w-[180px] sm:min-w-[220px] max-w-full sm:max-w-sm">
           <Search className="w-3.5 h-3.5 text-[#70777E] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             ref={searchInputRef}
@@ -864,7 +866,7 @@ export default function FileList({
         </div>
 
         {/* Controls: Group by Folder, Fold/Unfold, Sort, and Layout View Switcher */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
           {/* Custom Group By Basis Selector & Smart Contextual Expand/Collapse Pill */}
           <div className="flex items-center rounded-md bg-[#191D21] border border-[#30363C] p-0.5 shadow-sm">
             <div className="relative" ref={groupMenuRef} onMouseDown={(e) => e.stopPropagation()}>
@@ -877,14 +879,14 @@ export default function FileList({
                   setIsSortMenuOpen(false);
                 }}
                 title={`Group files: ${currentGroupOption.label} — ${currentGroupOption.description}`}
-                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer select-none ${
+                className={`flex items-center space-x-1.5 px-2 sm:px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer select-none ${
                   isGroupMenuOpen
                     ? 'bg-[#252B31] text-[#ECEFF1]'
                     : 'text-[#ECEFF1] hover:bg-[#252B31]/70'
                 }`}
               >
                 <CurrentGroupIcon className={`w-3.5 h-3.5 ${currentGroupOption.iconColor || 'text-[#B7C7D8]'}`} />
-                <span className="text-[#70777E] hidden sm:inline">Group:</span>
+                <span className="text-[#70777E] hidden md:inline">Group:</span>
                 <span className="font-semibold text-[#ECEFF1]">{currentGroupOption.label}</span>
                 <ChevronDown className={`w-3 h-3 text-[#70777E] transition-transform duration-150 ${isGroupMenuOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -960,20 +962,20 @@ export default function FileList({
                     type="button"
                     onClick={() => setCollapsedGroups(new Set())}
                     title="Expand all sections"
-                    className="flex items-center space-x-1.5 px-2 py-1 rounded text-xs font-medium text-[#B7C7D8] hover:text-[#ECEFF1] hover:bg-[#252B31] transition-colors cursor-pointer"
+                    className="flex items-center space-x-1 sm:space-x-1.5 px-1.5 sm:px-2 py-1 rounded text-xs font-medium text-[#B7C7D8] hover:text-[#ECEFF1] hover:bg-[#252B31] transition-colors cursor-pointer"
                   >
                     <ChevronsUpDown className="w-3.5 h-3.5 text-[#B7C7D8]" />
-                    <span>Expand All</span>
+                    <span className="hidden sm:inline">Expand All</span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setCollapsedGroups(new Set(compiledMultiGroups.map((g) => g.key)))}
                     title="Collapse all sections"
-                    className="flex items-center space-x-1.5 px-2 py-1 rounded text-xs font-medium text-[#92999F] hover:text-[#ECEFF1] hover:bg-[#252B31] transition-colors cursor-pointer"
+                    className="flex items-center space-x-1 sm:space-x-1.5 px-1.5 sm:px-2 py-1 rounded text-xs font-medium text-[#92999F] hover:text-[#ECEFF1] hover:bg-[#252B31] transition-colors cursor-pointer"
                   >
                     <ChevronsDownUp className="w-3.5 h-3.5 text-[#B7C7D8]" />
-                    <span>Collapse All</span>
+                    <span className="hidden sm:inline">Collapse All</span>
                   </button>
                 )}
               </>
@@ -991,14 +993,15 @@ export default function FileList({
                 setIsGroupMenuOpen(false);
               }}
               title={`Sort files: ${currentSortOption.label}`}
-              className={`flex items-center space-x-1.5 bg-[#191D21] border border-[#30363C] rounded px-2.5 py-1 text-xs transition-colors cursor-pointer select-none ${
+              className={`flex items-center space-x-1 sm:space-x-1.5 bg-[#191D21] border border-[#30363C] rounded px-2 sm:px-2.5 py-1 text-xs transition-colors cursor-pointer select-none ${
                 isSortMenuOpen
                   ? 'border-[#70777E] text-[#ECEFF1] bg-[#252B31]'
                   : 'text-[#92999F] hover:text-[#ECEFF1] hover:border-[#70777E]/50'
               }`}
             >
               <ArrowUpDown className="w-3 h-3 text-[#70777E]" />
-              <span className="text-[#ECEFF1] font-medium">{currentSortOption.label}</span>
+              <span className="text-[#ECEFF1] font-medium hidden sm:inline">{currentSortOption.label}</span>
+              <span className="text-[#ECEFF1] font-medium inline sm:hidden">Sort</span>
               <ChevronDown className={`w-3 h-3 text-[#70777E] transition-transform duration-150 ${isSortMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
@@ -1159,7 +1162,7 @@ export default function FileList({
 
                   {/* Cards Grid (Hidden when group is collapsed) */}
                   {!isCollapsed && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2.5 sm:gap-3">
                       {group.files.map((file) => {
                         const isSelected = selectedFileId === file.id;
                         const isChecked = isItemChecked(file.id);
@@ -1340,11 +1343,11 @@ export default function FileList({
                       className="w-3.5 h-3.5 rounded border-[#30363C] bg-[#191D21] text-[#B7C7D8] focus:ring-0 cursor-pointer"
                     />
                   </th>
-                  <th className="py-2.5 px-2.5">Name</th>
-                  <th className="py-2.5 px-2 w-28 lg:w-32 whitespace-nowrap">Tags</th>
-                  <th className="py-2.5 px-2 w-24 text-right whitespace-nowrap">Size</th>
+                  <th className="py-2.5 px-2 sm:px-2.5">Name</th>
+                  <th className="py-2.5 px-2 w-28 lg:w-32 whitespace-nowrap hidden md:table-cell">Tags</th>
+                  <th className="py-2.5 px-2 w-16 sm:w-20 md:w-24 text-right whitespace-nowrap">Size</th>
                   <th className="py-2.5 px-2 w-28 text-right whitespace-nowrap hidden lg:table-cell">Modified</th>
-                  <th className="py-2.5 px-3 w-32 text-right whitespace-nowrap">Actions</th>
+                  <th className="py-2.5 px-2 sm:px-3 w-20 sm:w-28 md:w-32 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#30363C]/60">
@@ -1375,8 +1378,8 @@ export default function FileList({
                             </button>
                           </td>
 
-                          <td className="py-2 px-2.5 min-w-0 overflow-hidden">
-                            <div className="flex items-center space-x-2 min-w-0">
+                          <td className="py-2 px-2 sm:px-2.5 min-w-0 overflow-hidden">
+                            <div className="flex items-center space-x-1.5 sm:space-x-2 min-w-0">
                               <GroupHeaderIcon group={group} isCollapsed={isCollapsed} />
                               <span className="font-semibold text-xs text-[#ECEFF1] tracking-wide truncate">
                                 {group.name}
@@ -1387,11 +1390,11 @@ export default function FileList({
                             </div>
                           </td>
 
-                          <td className="py-2 px-2 w-28 lg:w-32 overflow-hidden text-[10px] text-[#70777E]">
+                          <td className="py-2 px-2 w-28 lg:w-32 overflow-hidden text-[10px] text-[#70777E] hidden md:table-cell">
                             <span className="italic opacity-60 capitalize">{group.type || 'Folder'}</span>
                           </td>
 
-                          <td className="py-2 px-2 w-24 text-right font-mono text-[11px] font-medium text-[#ECEFF1] whitespace-nowrap">
+                          <td className="py-2 px-2 w-16 sm:w-20 md:w-24 text-right font-mono text-[11px] font-medium text-[#ECEFF1] whitespace-nowrap">
                             {formatBytes(group.totalSize)}
                           </td>
 
@@ -1399,13 +1402,13 @@ export default function FileList({
                             —
                           </td>
 
-                          <td className="py-2 px-3 w-32 text-right whitespace-nowrap">
+                          <td className="py-2 px-2 sm:px-3 w-20 sm:w-28 md:w-32 text-right whitespace-nowrap">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleGroupCollapse(group.key);
                               }}
-                              className="text-[10px] text-[#92999F] hover:text-[#ECEFF1] px-2 py-0.5 rounded bg-[#191D21] border border-[#30363C] hover:bg-[#252B31] transition-colors"
+                              className="text-[10px] text-[#92999F] hover:text-[#ECEFF1] px-1.5 sm:px-2 py-0.5 rounded bg-[#191D21] border border-[#30363C] hover:bg-[#252B31] transition-colors"
                             >
                               {isCollapsed ? 'Expand' : 'Collapse'}
                             </button>
@@ -1478,7 +1481,7 @@ export default function FileList({
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center space-x-2.5 min-w-0 overflow-hidden">
+                                  <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0 overflow-hidden">
                                     <FileThumbnail file={file} />
                                     <div className="min-w-0 flex-1">
                                       <span className="font-medium text-xs text-[#ECEFF1] truncate block" title={file.name}>
@@ -1494,12 +1497,26 @@ export default function FileList({
                                           <span className="truncate">{getSimpleFolderName(file.path, false)}</span>
                                         </div>
                                       )}
+                                      {/* Inline Tags on Mobile Screens (< md) */}
+                                      {file.tags && file.tags.length > 0 && (
+                                        <div className="flex md:hidden items-center gap-1 mt-1 overflow-hidden flex-wrap">
+                                          {file.tags.map((tag) => (
+                                            <span
+                                              key={tag.id}
+                                              className="text-[9px] px-1 py-0.2 rounded bg-[#191D21] text-[#92999F] border border-[#30363C] flex items-center space-x-1 flex-shrink-0"
+                                            >
+                                              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                                              <span className="truncate max-w-[65px]">{tag.name}</span>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 )}
                               </td>
 
-                              <td className="py-2 px-2 w-28 lg:w-32 overflow-hidden">
+                              <td className="py-2 px-2 w-28 lg:w-32 overflow-hidden hidden md:table-cell">
                                 <div className="flex items-center gap-1 overflow-hidden">
                                   {file.tags && file.tags.length > 0 ? (
                                     file.tags.map((tag) => (
@@ -1518,7 +1535,7 @@ export default function FileList({
                               </td>
 
                               {/* Size */}
-                              <td className="py-2 px-2 w-24 text-right font-mono text-[11px] text-[#92999F] whitespace-nowrap">
+                              <td className="py-2 px-2 w-16 sm:w-20 md:w-24 text-right font-mono text-[11px] text-[#92999F] whitespace-nowrap">
                                 {formatBytes(file.size)}
                               </td>
 
@@ -1527,8 +1544,8 @@ export default function FileList({
                                 {formatDate(file.updated_at)}
                               </td>
 
-                              {/* Actions: Exact [Eye] [Folder] [•••] matching user reference screenshot */}
-                              <td className="py-2 px-3 w-32 text-right whitespace-nowrap">
+                              {/* Actions */}
+                              <td className="py-2 px-2 sm:px-3 w-20 sm:w-28 md:w-32 text-right whitespace-nowrap">
                                 <FileRowActionBar
                                   file={file}
                                   activeActionId={activeActionId}
@@ -1602,7 +1619,7 @@ export default function FileList({
                                         </div>
                                       </td>
 
-                                      <td className="py-1.5 px-2 w-28 lg:w-32 overflow-hidden">
+                                      <td className="py-1.5 px-2 w-28 lg:w-32 overflow-hidden hidden md:table-cell">
                                         <div className="flex items-center gap-1 overflow-hidden">
                                           {child.tags && child.tags.length > 0 ? (
                                             child.tags.map((tag) => (
@@ -1620,7 +1637,7 @@ export default function FileList({
                                         </div>
                                       </td>
 
-                                      <td className="py-1.5 px-2 w-24 text-right font-mono text-[11px] text-[#92999F] whitespace-nowrap">
+                                      <td className="py-1.5 px-2 w-16 sm:w-20 md:w-24 text-right font-mono text-[11px] text-[#92999F] whitespace-nowrap">
                                         {formatBytes(child.size)}
                                       </td>
 
@@ -1628,7 +1645,7 @@ export default function FileList({
                                         {formatDate(child.updated_at)}
                                       </td>
 
-                                      <td className="py-1.5 px-3 w-32 text-right whitespace-nowrap">
+                                      <td className="py-1.5 px-2 sm:px-3 w-20 sm:w-28 md:w-32 text-right whitespace-nowrap">
                                         <FileRowActionBar
                                           file={child}
                                           activeActionId={activeActionId}
@@ -1664,32 +1681,32 @@ export default function FileList({
 
       {/* Floating Batch Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#191D21] border border-[#30363C] shadow-lg rounded-md px-4 py-2 flex items-center space-x-3 z-40">
-          <div className="flex items-center space-x-2 text-xs text-[#ECEFF1] pr-2 border-r border-[#30363C]">
-            <span className="font-mono text-[#B7C7D8] font-semibold">{selectedIds.size}</span>
-            <span>selected</span>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-[calc(100vw-20px)] bg-[#191D21]/95 backdrop-blur-md border border-[#30363C] shadow-2xl rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2 flex items-center space-x-1.5 sm:space-x-3 z-40 animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <div className="flex items-center space-x-1 sm:space-x-2 text-xs text-[#ECEFF1] pr-1.5 sm:pr-2.5 border-r border-[#30363C]">
+            <span className="font-mono text-[#B7C7D8] font-semibold text-xs sm:text-sm">{selectedIds.size}</span>
+            <span className="text-[10px] sm:text-xs text-[#92999F]">selected</span>
           </div>
 
           <button
             onClick={() => onRequestDeleteSelectedFiles(Array.from(selectedIds))}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-[#D98282]/15 hover:bg-[#D98282]/25 text-[#D98282] border border-[#D98282]/30 text-xs font-medium transition-colors"
+            className="flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-2.5 py-1 rounded-lg bg-[#D98282]/15 hover:bg-[#D98282]/25 text-[#D98282] border border-[#D98282]/30 text-[11px] sm:text-xs font-medium transition-colors"
           >
-            <Trash2 className="w-3 h-3" />
-            <span>Remove ({selectedIds.size})</span>
+            <Trash2 className="w-3 h-3 flex-shrink-0" />
+            <span>Remove <span className="hidden xs:inline">({selectedIds.size})</span></span>
           </button>
 
           <button
             onClick={handleCopySelectedPaths}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded bg-[#252B31] hover:bg-[#30363C] text-[#ECEFF1] text-xs font-medium border border-[#30363C] transition-colors"
+            className="flex items-center space-x-1 px-2 sm:px-2.5 py-1 rounded-lg bg-[#252B31] hover:bg-[#30363C] text-[#ECEFF1] text-[11px] sm:text-xs font-medium border border-[#30363C] transition-colors"
           >
-            <Copy className="w-3 h-3 text-[#B7C7D8]" />
-            <span>Copy Paths</span>
+            <Copy className="w-3 h-3 text-[#B7C7D8] flex-shrink-0" />
+            <span>Copy <span className="hidden xs:inline">Paths</span></span>
           </button>
 
           <button
             onClick={() => setSelectedIds(new Set())}
             title="Deselect All (Esc)"
-            className="p-1 text-[#70777E] hover:text-[#ECEFF1] transition-colors"
+            className="p-1 text-[#70777E] hover:text-[#ECEFF1] rounded hover:bg-[#252B31] transition-colors"
           >
             <X className="w-3.5 h-3.5" />
           </button>
